@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import sys
+import socket
 import struct
 import zlib
 import json
@@ -174,6 +175,7 @@ def get_http_request_handler(systemd_message_handler):
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     """Handle requests in a separate thread."""
+    address_family = socket.AF_INET6
 
 
 if __name__ == '__main__':
@@ -182,7 +184,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--graylog-host', default='localhost')
     parser.add_argument('--graylog-port', type=int, default=12201)
-    parser.add_argument('--listen-host', default='localhost')
+    parser.add_argument('--listen-host', default='::')
     parser.add_argument('--listen-port', type=int, default=8080)
     args = parser.parse_args()
 
