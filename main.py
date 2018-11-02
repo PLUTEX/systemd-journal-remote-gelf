@@ -99,7 +99,6 @@ class SystemdMessageHandler:
                 continue
             else:
                 msg['_' + key] = value
-        print(msg)
         self.gelf_handler.send(zlib.compress(json.dumps(msg).encode()))
 
 
