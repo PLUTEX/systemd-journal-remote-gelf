@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
-import sys
+import json
 import socket
 import struct
+import sys
 import zlib
-import json
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 
