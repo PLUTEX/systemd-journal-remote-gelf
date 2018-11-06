@@ -183,6 +183,9 @@ def get_http_request_handler(gelf_handler):
                         systemd_message_handler.handle_line(buf + line)
                         buf = b""
 
+        def log_request(code='-', size='-'):
+            pass
+
     return Handler
 
 
