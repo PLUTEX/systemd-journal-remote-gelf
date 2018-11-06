@@ -103,7 +103,7 @@ class SystemdMessageHandler:
         self.gelf_handler.send(zlib.compress(json.dumps(msg).encode()))
 
 
-def get_http_request_handler(systemd_message_handler):
+def get_http_request_handler(gelf_handler):
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self):
             if self.path != '/upload':
@@ -121,6 +121,10 @@ def get_http_request_handler(systemd_message_handler):
             self.end_headers()
 
             buf = b""
+
+            systemd_message_handler = SystemdMessageHandler(
+                gelf_handler,
+            )
 
             while True:
                 if chunked:
@@ -189,9 +193,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     gelf_handler = graypy.GELFHandler(args.graylog_host, args.graylog_port)
-    systemd_message_handler = SystemdMessageHandler(gelf_handler)
     server = ThreadedHTTPServer(
         (args.listen_host, args.listen_port),
-        get_http_request_handler(systemd_message_handler),
+        get_http_request_handler(gelf_handler),
     )
     server.serve_forever()
