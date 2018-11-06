@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import ipaddress
 import json
 import socket
 import struct
@@ -34,12 +35,16 @@ class SystemdMessageHandler:
         23: "local7"
     }
 
-    def __init__(self, gelf_handler):
+    def __init__(self, gelf_handler, client):
         self.message = {}
         self.current_key = None
         self.current_length = None
         self.current_read = None
         self.gelf_handler = gelf_handler
+        try:
+            self.client = str(ipaddress.ip_address(client).ipv4_mapped or client)
+        except AttributeError:
+            self.client = client
 
     def handle_line(self, line):
         if self.current_key:
@@ -76,7 +81,10 @@ class SystemdMessageHandler:
             self.message[self.current_key] = b""
 
     def finalize_message(self):
-        msg = {'version': '1.0'}
+        msg = {
+            'version': '1.0',
+            '__real_remote_ip': self.client,
+        }
         for key, value in self.message.items():
             if key == '__REALTIME_TIMESTAMP':
                 msg['timestamp'] = float(value) / (1000 * 1000)
@@ -124,6 +132,7 @@ def get_http_request_handler(gelf_handler):
 
             systemd_message_handler = SystemdMessageHandler(
                 gelf_handler,
+                self.client_address[0],
             )
 
             while True:
