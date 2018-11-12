@@ -81,8 +81,11 @@ class SystemdMessageHandler:
             self.message[self.current_key] = b""
 
     def finalize_message(self):
+        # we populate the mandatory fields with sane defaults and hope for them to be overridden
         msg = {
-            'version': '1.0',
+            'version': '1.1',
+            'short_message': 'missing',
+            'host': self.client,
             '__real_remote_ip': self.client,
         }
         for key, value in self.message.items():
