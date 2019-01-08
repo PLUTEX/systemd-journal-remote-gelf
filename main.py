@@ -135,7 +135,7 @@ def get_http_request_handler(gelf_handler):
 
             systemd_message_handler = SystemdMessageHandler(
                 gelf_handler,
-                self.client_address[0],
+                self.headers.get('X-Forwarded-For', self.client_address[0]),
             )
 
             while True:
