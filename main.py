@@ -142,7 +142,14 @@ def get_http_request_handler(gelf_handler):
                 if chunked:
                     chunk_length_line = self.rfile.readline()
                     if not chunk_length_line.endswith(b'\r\n'):
-                        self.send_error(400)
+                        self.send_error(
+                            400,
+                            'Bad request',
+                            'Chunk length line did not end with \\r\\n',
+                        )
+                        self.log_message(
+                            'Chunk length line without \\r\\n: {!r}'.format(chunk_length_line)
+                        )
                         return
 
                     chunk_length = int(chunk_length_line[:-2], 16)
