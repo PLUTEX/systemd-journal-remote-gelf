@@ -51,14 +51,14 @@ class SystemdMessageHandler:
     def handle_line(self, line):
         if self.current_key:
             if self.current_length is None:
-                if len(line) >= 8:
-                    self.current_length = struct.unpack('<Q', line[:8])[0]
+                missing_length = 8 - len(self.message[self.current_key])
+                self.message[self.current_key] += line[:missing_length]
+                if len(self.message[self.current_key]) == 8:
+                    self.current_length = struct.unpack('<Q', self.message[self.current_key])[0]
                     self.current_read = 0
-                    line = line[8:]
+                    line = line[missing_length:]
                 else:
-                    raise SystemdMessageHandler.FormatError(
-                        "Binary journald content missing length field"
-                    )
+                    return
 
             self.current_read += len(line)
             if self.current_read == self.current_length + 1:
