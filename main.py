@@ -4,7 +4,6 @@ import ipaddress
 import json
 import socket
 import struct
-import sys
 import zlib
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
@@ -35,6 +34,9 @@ class SystemdMessageHandler:
         23: "local7"
     }
 
+    class FormatError(ValueError):
+        pass
+
     def __init__(self, gelf_handler, client):
         self.message = {}
         self.current_key = None
@@ -49,16 +51,20 @@ class SystemdMessageHandler:
     def handle_line(self, line):
         if self.current_key:
             if self.current_length is None:
-                self.current_length = struct.unpack('<Q', line[:8])[0]
-                self.current_read = 0
-                line = line[8:]
+                if len(line) >= 8:
+                    self.current_length = struct.unpack('<Q', line[:8])[0]
+                    self.current_read = 0
+                    line = line[8:]
+                else:
+                    raise SystemdMessageHandler.FormatError(
+                        "Binary journald content missing length field"
+                    )
 
             self.current_read += len(line)
             if self.current_read == self.current_length + 1:
                 if not line.endswith(b'\n'):
-                    print(
-                        "Binary journald content not ended by \\n",
-                        file=sys.stderr,
+                    raise SystemdMessageHandler.FormatError(
+                        "Binary journald content not ended by \\n"
                     )
 
                 self.message[self.current_key] += line[:-1]
@@ -158,7 +164,15 @@ def get_http_request_handler(gelf_handler):
 
                 for line in self.rfile:
                     if not chunked:
-                        systemd_message_handler.handle_line(line)
+                        try:
+                            systemd_message_handler.handle_line(line)
+                        except SystemdMessageHandler.FormatError as e:
+                            self.send_error(
+                                400,
+                                'Bad Request',
+                                str(e),
+                            )
+                            self.log_message("{} when processing {!r}".format(e, line))
                         continue
 
                     received += len(line)
@@ -190,7 +204,15 @@ def get_http_request_handler(gelf_handler):
                         )
                         return
                     else:
-                        systemd_message_handler.handle_line(buf + line)
+                        try:
+                            systemd_message_handler.handle_line(buf + line)
+                        except SystemdMessageHandler.FormatError as e:
+                            self.send_error(
+                                400,
+                                'Bad Request',
+                                str(e),
+                            )
+                            self.log_message("{} when processing {!r}".format(e, buf + line))
                         buf = b""
 
         def log_request(code='-', size='-'):
