@@ -1,1 +1,1 @@
-graypy
+graypy>=1.0

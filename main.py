@@ -236,7 +236,7 @@ if __name__ == '__main__':
     parser.add_argument('--listen-port', type=int, default=8080)
     args = parser.parse_args()
 
-    gelf_handler = graypy.GELFHandler(args.graylog_host, args.graylog_port)
+    gelf_handler = graypy.GELFUDPHandler(args.graylog_host, args.graylog_port)
     server = ThreadedHTTPServer(
         (args.listen_host, args.listen_port),
         get_http_request_handler(gelf_handler),
