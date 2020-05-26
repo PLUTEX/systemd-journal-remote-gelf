@@ -122,6 +122,11 @@ class SystemdMessageHandler:
 
 def get_http_request_handler(gelf_handler):
     class Handler(BaseHTTPRequestHandler):
+        class ClientError(Exception):
+            def __init__(self, message, explain):
+                super().__init__(message)
+                self.explain = explain
+
         def do_POST(self):
             if self.path != '/upload':
                 self.send_error(404)
@@ -131,89 +136,94 @@ def get_http_request_handler(gelf_handler):
                 self.send_error(415)
                 return
 
-            chunked = self.headers['Transfer-Encoding'] == 'chunked'
-
             self.send_response(100)
             self.send_response(200)
             self.end_headers()
-
-            buf = b""
 
             systemd_message_handler = SystemdMessageHandler(
                 gelf_handler,
                 self.client_address[0],
             )
 
-            while True:
-                if chunked:
-                    chunk_length_line = self.rfile.readline()
-                    if not chunk_length_line.endswith(b'\r\n'):
-                        self.send_error(
-                            400,
-                            'Bad request',
-                            'Chunk length line did not end with \\r\\n',
+            try:
+                if self.headers['Transfer-Encoding'] == 'chunked':
+                    while self.do_POST_chunk(systemd_message_handler):
+                        pass
+                else:
+                    for line in self.rfile:
+                        systemd_message_handler.handle_line(line)
+
+            except (self.ClientError, SystemdMessageHandler.FormatError) as e:
+                try:
+                    self.send_error(
+                        400,
+                        str(e),
+                        getattr(e, 'explain'),
+                    )
+                except BrokenPipeError:
+                    # the client may have disconnected unexpectedly
+                    pass
+
+            except BrokenPipeError:
+                # the client may have disconnected unexpectedly
+                pass
+
+        def do_POST_chunk(self, handler):
+            chunk_length_line = self.rfile.readline()
+            if not chunk_length_line:
+                return False
+
+            if not chunk_length_line.endswith(b'\r\n'):
+                raise self.ClientError(
+                    'Chunk Length Unterminated',
+                    f'The chunk length line {repr(chunk_length_line)} was not '
+                    'properly terminated by CRLF.',
+                )
+
+            chunk_length = int(chunk_length_line[:-2], 16)
+
+            received = 0
+            buf = b""
+
+            for line in self.rfile:
+                received += len(line)
+                if received == chunk_length + 2:
+                    if not line.endswith(b'\r\n'):
+                        raise self.ClientError(
+                            'Chunk Unterminated',
+                            'The chunk was not properly terminated by CRLF.'
                         )
-                        self.log_message(
-                            'Chunk length line without \\r\\n: {!r}'.format(chunk_length_line)
-                        )
-                        return
 
-                    chunk_length = int(chunk_length_line[:-2], 16)
-
-                    received = 0
-
-                for line in self.rfile:
-                    if not chunked:
-                        try:
-                            systemd_message_handler.handle_line(line)
-                        except SystemdMessageHandler.FormatError as e:
-                            self.send_error(
-                                400,
-                                'Bad Request',
-                                str(e),
+                    if chunk_length == 0:
+                        self.send_response(202)
+                        self.end_headers()
+                        if len(buf) > 0:
+                            self.log_message(
+                                'Line buffer not empty at end of chunked transfer'
                             )
-                            self.log_message("{} when processing {!r}".format(e, line))
-                        continue
-
-                    received += len(line)
-                    if received == chunk_length + 2:
-                        if not line.endswith(b'\r\n'):
-                            self.send_error(
-                                400,
-                                'Bad Request',
-                                'Chunk did not end with \\r\\n',
-                            )
-                            return
-
-                        if chunk_length == 0:
-                            self.send_response(202)
-                            self.end_headers()
-                            if len(buf) > 0:
-                                self.log_message(
-                                    "Line buffer not empty at end of chunked transfer"
-                                )
-                            return
-                        else:
-                            buf = line[:-2]
-                            break
-                    elif received > chunk_length + 2:
-                        self.send_error(
-                            400,
-                            'Bad Request',
-                            'Chunk longer than specified',
-                        )
                         return
                     else:
-                        try:
-                            systemd_message_handler.handle_line(buf + line)
-                        except SystemdMessageHandler.FormatError as e:
-                            self.send_error(
-                                400,
-                                'Bad Request',
-                                str(e),
-                            )
-                            self.log_message("{} when processing {!r}".format(e, buf + line))
-                        buf = b""
+                        buf = line[:-2]
+                        break
+                elif received > chunk_length + 2:
+                    raise self.ClientError(
+                        'Chunk Length Exceeded',
+                        'The chunk was longer than specified initially '
+                        f'(expected {chunk_length + 2} bytes, '
+                        f'read {received} so far)'
+                    )
+                else:
+                    try:
+                        handler.handle_line(buf + line)
+                    except SystemdMessageHandler.FormatError as e:
+                        raise self.ClientError(
+                            'Journal Format Error',
+                            str(e),
+                        )
+
+                    buf = b""
+
+            return True
 
         def log_request(code='-', size='-'):
             pass
