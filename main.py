@@ -147,6 +147,7 @@ def get_http_request_handler(gelf_handler):
 
             try:
                 if self.headers['Transfer-Encoding'] == 'chunked':
+                    self.buf = b""
                     while self.do_POST_chunk(systemd_message_handler):
                         pass
                 else:
@@ -183,7 +184,6 @@ def get_http_request_handler(gelf_handler):
             chunk_length = int(chunk_length_line[:-2], 16)
 
             received = 0
-            buf = b""
 
             for line in self.rfile:
                 received += len(line)
@@ -197,13 +197,13 @@ def get_http_request_handler(gelf_handler):
                     if chunk_length == 0:
                         self.send_response(202)
                         self.end_headers()
-                        if len(buf) > 0:
+                        if len(self.buf) > 0:
                             self.log_message(
                                 'Line buffer not empty at end of chunked transfer'
                             )
                         return
                     else:
-                        buf = line[:-2]
+                        self.buf = line[:-2]
                         break
                 elif received > chunk_length + 2:
                     raise self.ClientError(
@@ -214,14 +214,14 @@ def get_http_request_handler(gelf_handler):
                     )
                 else:
                     try:
-                        handler.handle_line(buf + line)
+                        handler.handle_line(self.buf + line)
                     except SystemdMessageHandler.FormatError as e:
                         raise self.ClientError(
                             'Journal Format Error',
                             str(e),
                         )
 
-                    buf = b""
+                    self.buf = b""
 
             return True
 
