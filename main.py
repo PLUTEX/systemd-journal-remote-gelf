@@ -161,11 +161,11 @@ def get_http_request_handler(gelf_handler):
                         str(e),
                         getattr(e, 'explain'),
                     )
-                except BrokenPipeError:
+                except (ConnectionResetError, BrokenPipeError):
                     # the client may have disconnected unexpectedly
                     pass
 
-            except BrokenPipeError:
+            except (ConnectionResetError, BrokenPipeError):
                 # the client may have disconnected unexpectedly
                 pass
 
