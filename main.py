@@ -120,7 +120,7 @@ class SystemdMessageHandler:
         self.gelf_handler.send(zlib.compress(json.dumps(msg).encode()))
 
 
-def get_http_request_handler(gelf_handler):
+def get_http_request_handler(gelf_handler, x_forwarded_for):
     class Handler(BaseHTTPRequestHandler):
         class ClientError(Exception):
             def __init__(self, message, explain):
@@ -155,7 +155,7 @@ def get_http_request_handler(gelf_handler):
 
             systemd_message_handler = SystemdMessageHandler(
                 gelf_handler,
-                self.client_address[0],
+                x_forwarded_for and self.headers['X-Forwarded-For'] or self.client_address[0],
             )
 
             try:
@@ -257,11 +257,12 @@ if __name__ == '__main__':
     parser.add_argument('--graylog-port', type=int, default=12201)
     parser.add_argument('--listen-host', default='::')
     parser.add_argument('--listen-port', type=int, default=8080)
+    parser.add_argument('--x-forwarded-for', action='store_true')
     args = parser.parse_args()
 
     gelf_handler = graypy.GELFUDPHandler(args.graylog_host, args.graylog_port)
     server = ThreadedHTTPServer(
         (args.listen_host, args.listen_port),
-        get_http_request_handler(gelf_handler),
+        get_http_request_handler(gelf_handler, args.x_forwarded_for),
     )
     server.serve_forever()
