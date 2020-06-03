@@ -122,6 +122,8 @@ class SystemdMessageHandler:
 
 def get_http_request_handler(gelf_handler, x_forwarded_for):
     class Handler(BaseHTTPRequestHandler):
+        protocol_version = 'HTTP/1.1'
+
         class ClientError(Exception):
             def __init__(self, message, explain):
                 super().__init__(message)
@@ -132,6 +134,7 @@ def get_http_request_handler(gelf_handler, x_forwarded_for):
                 self.send_error(405)
             elif self.path == '/':
                 self.send_response(204)
+                self.send_header('Content-Length', 0)
                 self.end_headers()
             else:
                 self.send_error(404)
@@ -149,8 +152,8 @@ def get_http_request_handler(gelf_handler, x_forwarded_for):
                 self.send_error(415)
                 return
 
-            self.send_response(100)
-            self.send_response(200)
+            self.send_response(204)
+            self.send_header('Content-Length', 0)
             self.end_headers()
 
             systemd_message_handler = SystemdMessageHandler(
