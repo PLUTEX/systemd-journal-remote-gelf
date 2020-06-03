@@ -127,7 +127,20 @@ def get_http_request_handler(gelf_handler):
                 super().__init__(message)
                 self.explain = explain
 
+        def do_GET(self):
+            if self.path == '/upload':
+                self.send_error(405)
+            elif self.path == '/':
+                self.send_response(204)
+                self.end_headers()
+            else:
+                self.send_error(404)
+
         def do_POST(self):
+            if self.path == '/':
+                self.send_error(405)
+                return
+
             if self.path != '/upload':
                 self.send_error(404)
                 return
