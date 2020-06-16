@@ -4,6 +4,7 @@ import ipaddress
 import json
 import socket
 import struct
+import sys
 import zlib
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
@@ -250,6 +251,10 @@ def get_http_request_handler(gelf_handler, x_forwarded_for):
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     """Handle requests in a separate thread."""
     address_family = socket.AF_INET6
+
+    def handle_error(self, request, client_address):
+        exc = sys.exc_info()
+        print(f'[{client_address}] {exc[0].__name__}: {exc[1]}', file=sys.stderr)
 
 
 if __name__ == '__main__':
