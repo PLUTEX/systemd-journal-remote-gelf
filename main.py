@@ -251,7 +251,7 @@ def get_http_request_handler(gelf_handler, x_forwarded_for):
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     """Handle requests in a separate thread."""
     address_family = socket.AF_INET6
-    block_on_close = False
+    daemon_threads = True
 
     def handle_error(self, request, client_address):
         exc = sys.exc_info()
