@@ -1,0 +1,27 @@
+#  SPDX-License-Identifier: LGPL-2.1+
+
+[Unit]
+Description=Journal Remote Sink GELF Service
+
+[Service]
+ExecStart=/opt/systemd-journal-remote-gelf/main.py --listen-host=::ffff:192.0.2.1 --listen-port=8080 --graylog-port=12201 --graylog-host=127.0.0.1 --x-forwarded-for
+
+DynamicUser=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectControlGroups=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+MemoryDenyWriteExecute=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+LockPersonality=yes
+
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
