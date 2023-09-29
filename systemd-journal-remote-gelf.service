@@ -2,9 +2,11 @@
 
 [Unit]
 Description=Journal Remote Sink GELF Service
+ConditionPathExists=/etc/default/systemd-journal-remote-gelf
 
 [Service]
-ExecStart=/opt/systemd-journal-remote-gelf/main.py --listen-host=::ffff:192.0.2.1 --listen-port=8080 --graylog-port=12201 --graylog-host=127.0.0.1 --x-forwarded-for
+ExecStart=/opt/systemd-journal-remote-gelf/main.py --listen-host $LISTEN_HOST --listen-port $LISTEN_PORT --graylog-port $GRAYLOG_PORT --graylog-host $GRAYLOG_HOST --x-forwarded-for
+EnvironmentFile=/etc/default/systemd-journal-remote-gelf
 
 DynamicUser=yes
 PrivateTmp=yes
